@@ -12,6 +12,7 @@ setup(
     url='https://www.example.com/',
     packages=find_packages(),
     install_requires=[
-        'influxdb'
+        'influxdb',
+        'schedule'
     ]
 )

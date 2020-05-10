@@ -9,9 +9,13 @@ class AirMonitorDbClient:
         self.client = InfluxDBClient('localhost', 8086, 'python', 'cHzSQ7EWcsmY4q3ctyNB', 'airmonitor')
         self.mode = mode
 
-    def record_value(self, desc, value, time=str(datetime.utcnow().isoformat(timespec='seconds') + "Z"), location='unknown'):
+    def record_value(self, desc, value, time=None, location='unknown'):
+
+        if time == None:
+            time = datetime.utcnow().isoformat() + "Z"
 
         print(time)
+
         if self.mode == "test":
             desc = "dev_" + desc
 
@@ -27,6 +31,3 @@ class AirMonitorDbClient:
         }]
 
         self.client.write_points(body)
-
-       
-
