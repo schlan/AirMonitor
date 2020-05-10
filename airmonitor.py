@@ -2,7 +2,7 @@
 
 from datastore import AirMonitorDbClient
 from i2c import I2C
-from scd30.ref_python_scd30 import SCD30
+from scd30 import SCD30
 from time import sleep
 
 if __name__ == "__main__":
