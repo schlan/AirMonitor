@@ -113,7 +113,7 @@ class SCD30:
     def get_automatic_recalibration(self):
         bint = self.__read_bytes(self.SET_ASC, 3)
         self.__check_crc(bint)
-        return struct.unpack('>H', bint)[0] == 1
+        return struct.unpack('>H', bint[0:2])[0] == 1
 
     def set_automatic_recalibration(self, enable):
         bint = struct.pack('>H', 1 if enable else 0)
@@ -121,18 +121,16 @@ class SCD30:
         data = bint + bytes([crc])
         self.__write_command(self.SET_FRC, data)
         
-
     def get_forced_recalibration(self):
         bint = self.__read_bytes(self.SET_FRC, 3)
         self.__check_crc(bint)
-        return struct.unpack('>H', bint)[0]
+        return struct.unpack('>H', bint[0:2])[0]
 
     def set_forced_recalibration(self, co2ppm):
         bint = struct.pack('>H', co2ppm)
         crc = self.__crc(bint[0], bint[1])
         data = bint + bytes([crc])
         self.__write_command(self.SET_FRC, data)
-        
 
     def get_temperature_offset(self):
         bint = self.__read_bytes(self.SET_TEMP_OFFSET, 3)
@@ -148,7 +146,7 @@ class SCD30:
     def get_altitude_comp(self):
         bint = self.__read_bytes(self.SET_ALT_COMP, 3)
         self.__check_crc(bint)
-        return struct.unpack('>H', bint)[0]
+        return struct.unpack('>H', bint[0:2])[0]
 
     def set_altitude_comp(self, altitude):
         bint = struct.pack('>H', altitude)
@@ -157,8 +155,8 @@ class SCD30:
         self.__write_command(self.SET_ALT_COMP, data)
 
     def __write_command(self, cmd, data=bytearray()):
-        bcmd = struct.pack('>H', cmd)
-        self.i2c.write(self.addr, bcmd + data)
+        data = struct.pack('>H', cmd) + data
+        self.i2c.write(self.addr, data)
 
     def __read_bytes(self, cmd, count):
         self.__write_command(cmd)
