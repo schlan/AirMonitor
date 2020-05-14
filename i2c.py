@@ -28,6 +28,21 @@ class I2C:
             if i2c:
                 self.client.i2c_close(i2c)
 
+    def read_block(self, address, reg, n=1):
+        i2c = self.client.i2c_open(self.bus, address)
+        try:
+            (count, data) = self.client.i2c_read_i2c_block_data(i2c, reg, n)
+            if n == count:
+                return data
+            else:
+                print("Did not read enough bytes")
+                return False
+        except: 
+            print("Error reading")
+        finally:
+            if i2c:
+                self.client.i2c_close(i2c)
+
 
     def write(self, address, data):
         i2c = self.client.i2c_open(self.bus, address)
