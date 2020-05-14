@@ -72,6 +72,7 @@ class SCD30:
 
     def read_measurement(self):
         measurement = self.__read_bytes(self.READ_MEASUREMENT, 18)
+        
         for i in range(0, len(measurement), 3):
             self.__check_crc(measurement[i:i+3])
 
@@ -91,7 +92,7 @@ class SCD30:
     def get_measurement_interval(self):
         bint = self.__read_bytes(self.SET_MEASURE_INTERVAL, 3)
         self.__check_crc(bint)
-        return struct.unpack('>H', bint)[0]
+        return struct.unpack('>H', bint[0:2])[0]
 
     def set_measurement_interval(self, interval):
         bint = struct.pack('>H', interval)

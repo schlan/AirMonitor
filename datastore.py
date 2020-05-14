@@ -9,20 +9,17 @@ class AirMonitorDbClient:
         self.client = InfluxDBClient('localhost', 8086, 'python', 'cHzSQ7EWcsmY4q3ctyNB', 'airmonitor')
         self.mode = mode
 
-    def record_value(self, desc, value, time=None, location='unknown'):
 
+    def record_value(self, desc, value, time=None, sensor=None, location='unknown'):
         if time == None:
             time = datetime.utcnow().isoformat() + "Z"
-
-        print(time)
-
-        if self.mode == "test":
-            desc = "dev_" + desc
 
         body = [{
             "measurement": str(desc),
             "tags": {
                 "location": str(location),
+                "sensor": str(sensor),
+                "mode": self.mode,
             },   
             "fields": {
                 "value": value
