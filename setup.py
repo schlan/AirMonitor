@@ -14,6 +14,10 @@ setup(
     install_requires=[
         'influxdb',
         'schedule',
-        'serial'
+        'pyserial',
+        'pigpio',
+        'spidev',
+        'RPi.GPIO',
+        'Pillow'
     ]
 )
