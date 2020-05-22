@@ -73,6 +73,26 @@ def load_bme280_data():
 def start_display():
     disp.init()
 
+    def paint_box(w, h, title, value, unit):
+        image1 = Image.new('1', (w, h), 255)
+        image2 = Image.new('1', (w, h), 255)
+        draw1 = ImageDraw.Draw(image1)
+        draw2 = ImageDraw.Draw(image2)
+
+        # Center title
+        (x_title, y_title, w_title, h_title) = font24.getmask(title).getbbox()
+        draw2.text((w / 2 - (w_title + x_title) / 2, 5), title, font = font24, fill = 0)
+
+        # Draw value
+        value_string = '{:.2f}\u2009{}'.format(value, unit)
+        (x_value, y_value, w_value, h_value) = font56.getmask(value_string).getbbox()
+        draw1.text((w / 2 - (w_value + x_value) / 2, 32), value_string, font = font56, fill = 0)
+        
+        # draw1.rectangle((0, 0, w - 1, h - 1), outline = 0)
+
+        return (image1, image2)
+
+
     while True:
         image1 = Image.new('1', (disp.width, disp.height), 255)
         image2 = Image.new('1', (disp.width, disp.height), 255)
@@ -80,14 +100,17 @@ def start_display():
         draw1 = ImageDraw.Draw(image1)
         draw2 = ImageDraw.Draw(image2)
 
-        draw2.text((10, 0), 'Temperature', font = font24, fill = 0)
-        draw1.text((10, 26), '{:.2f} °C'.format(db.get_value("temp", "bme280")), font = font56, fill = 0)
+        (temp_img1, temp_img2) = paint_box(240, 100, "Temperature", db.get_value("temp", "bme280"), "°C")
+        image1.paste(temp_img1, (0, 0))
+        image2.paste(temp_img2, (0, 0))
 
-        draw2.text((250, 0), 'CO2', font = font24, fill = 0)
-        draw1.text((250, 26), '{:.2f} ppm'.format(db.get_value("co2", "scd30")), font = font56, fill = 0)
+        (co2_img1, co2_img2) = paint_box(320, 100, "CO2", db.get_value("co2", "scd30"), "ppm")
+        image1.paste(co2_img1, (240, 0))
+        image2.paste(co2_img2, (240, 0))
 
-        draw2.text((580, 0), 'Relative Humidity', font = font24, fill = 0)
-        draw1.text((580, 26), '{:.2f} %'.format(db.get_value("rh", "scd30")), font = font56, fill = 0)
+        (rh_img1, rh_img2) = paint_box(240, 100, "Relative Humidity", db.get_value("rh", "scd30"), "%")
+        image1.paste(rh_img1, (560, 0))
+        image2.paste(rh_img2, (560, 0))
 
         date = datetime.now().strftime("%A, %d %B %Y")
         (x, y, w, h) = font24.getmask(date).getbbox()
