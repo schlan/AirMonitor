@@ -73,6 +73,8 @@ def load_bme280_data():
 def start_display():
     disp.init()
 
+    refresh_interval = 5 * 60
+
     def paint_box(w, h, title, value, unit):
         image1 = Image.new('1', (w, h), 255)
         image2 = Image.new('1', (w, h), 255)
@@ -88,8 +90,6 @@ def start_display():
         (x_value, y_value, w_value, h_value) = font56.getmask(value_string).getbbox()
         draw1.text((w / 2 - (w_value + x_value) / 2, 32), value_string, font = font56, fill = 0)
         
-        # draw1.rectangle((0, 0, w - 1, h - 1), outline = 0)
-
         return (image1, image2)
 
 
@@ -100,15 +100,15 @@ def start_display():
         draw1 = ImageDraw.Draw(image1)
         draw2 = ImageDraw.Draw(image2)
 
-        (temp_img1, temp_img2) = paint_box(240, 100, "Temperature", db.get_value("temp", "bme280"), "°C")
+        (temp_img1, temp_img2) = paint_box(240, 100, "Temperature", db.get_mean_value("temp", "bme280", refresh_interval), "°C")
         image1.paste(temp_img1, (0, 0))
         image2.paste(temp_img2, (0, 0))
 
-        (co2_img1, co2_img2) = paint_box(320, 100, "CO2", db.get_value("co2", "scd30"), "ppm")
+        (co2_img1, co2_img2) = paint_box(320, 100, "CO2", db.get_mean_value("co2", "scd30", refresh_interval), "ppm")
         image1.paste(co2_img1, (240, 0))
         image2.paste(co2_img2, (240, 0))
 
-        (rh_img1, rh_img2) = paint_box(240, 100, "Relative Humidity", db.get_value("rh", "scd30"), "%")
+        (rh_img1, rh_img2) = paint_box(240, 100, "Relative Humidity", db.get_mean_value("rh", "scd30", refresh_interval), "%")
         image1.paste(rh_img1, (560, 0))
         image2.paste(rh_img2, (560, 0))
 
@@ -117,7 +117,7 @@ def start_display():
         draw1.text((disp.width - w - 10, disp.height - h - 5), date, font = font24, fill = 0)
 
         disp.display(disp.getbuffer(image1), disp.getbuffer(image2))
-        sleep(60 * 5)
+        sleep(refresh_interval)
 
 
 def run_threaded(job_func):
@@ -127,8 +127,10 @@ def run_threaded(job_func):
 if __name__ == "__main__":
     init_scd30()
     init_sds011()
-    run_threaded(start_display)
 
+    # Load some data now
+    run_threaded(start_display)
+    
     every(30).seconds.do(run_threaded, load_co2_data)
     every(30).seconds.do(run_threaded, load_bme280_data)
     every(5).minutes.do(run_threaded, load_sds011_data)
