@@ -6,10 +6,9 @@ from sensors import SCD30, SDS011, BME280
 from time import sleep
 from schedule import every, run_pending
 from threading import Thread
-from datetime import datetime
 
 from display import Display
-from PIL import Image,ImageDraw,ImageFont
+from presenter import Presenter
 
 db = AirMonitorDbClient("test")
 i2c = I2C(bus=1)
@@ -18,8 +17,7 @@ bme280 = BME280(i2c, 0x76)
 sds011 = SDS011("/dev/ttyS0")
 
 disp = Display()
-font24 = ImageFont.truetype('./fonts/Roboto-Medium.ttf', 24)
-font56 = ImageFont.truetype('./fonts/Roboto-Medium.ttf', 56)
+presenter = Presenter(db)
 
 def init_scd30():
     scd30.start_continous_measurement()
@@ -72,53 +70,12 @@ def load_bme280_data():
 
 def start_display():
     disp.init()
-
     refresh_interval = 5 * 60
 
-    def paint_box(w, h, title, value, unit):
-        image1 = Image.new('1', (w, h), 255)
-        image2 = Image.new('1', (w, h), 255)
-        draw1 = ImageDraw.Draw(image1)
-        draw2 = ImageDraw.Draw(image2)
-
-        # Center title
-        (x_title, y_title, w_title, h_title) = font24.getmask(title).getbbox()
-        draw2.text((w / 2 - (w_title + x_title) / 2, 5), title, font = font24, fill = 0)
-
-        # Draw value
-        value_string = '{:.2f}\u2009{}'.format(value, unit)
-        (x_value, y_value, w_value, h_value) = font56.getmask(value_string).getbbox()
-        draw1.text((w / 2 - (w_value + x_value) / 2, 32), value_string, font = font56, fill = 0)
-        
-        return (image1, image2)
-
-
     while True:
-        image1 = Image.new('1', (disp.width, disp.height), 255)
-        image2 = Image.new('1', (disp.width, disp.height), 255)
-        
-        draw1 = ImageDraw.Draw(image1)
-        draw2 = ImageDraw.Draw(image2)
-
-        (temp_img1, temp_img2) = paint_box(240, 100, "Temperature", db.get_mean_value("temp", "bme280", refresh_interval), "°C")
-        image1.paste(temp_img1, (0, 0))
-        image2.paste(temp_img2, (0, 0))
-
-        (co2_img1, co2_img2) = paint_box(320, 100, "CO2", db.get_mean_value("co2", "scd30", refresh_interval), "ppm")
-        image1.paste(co2_img1, (240, 0))
-        image2.paste(co2_img2, (240, 0))
-
-        (rh_img1, rh_img2) = paint_box(240, 100, "Relative Humidity", db.get_mean_value("rh", "scd30", refresh_interval), "%")
-        image1.paste(rh_img1, (560, 0))
-        image2.paste(rh_img2, (560, 0))
-
-        date = datetime.now().strftime("%A, %d %B %Y")
-        (x, y, w, h) = font24.getmask(date).getbbox()
-        draw1.text((disp.width - w - 10, disp.height - h - 5), date, font = font24, fill = 0)
-
+        (image1, image2) = presenter.render(disp.width, disp.height, refresh_interval)
         disp.display(disp.getbuffer(image1), disp.getbuffer(image2))
         sleep(refresh_interval)
-
 
 def run_threaded(job_func):
     job_thread = Thread(target=job_func)
