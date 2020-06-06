@@ -6,8 +6,8 @@ from sensors import SCD30, SDS011, BME280
 from time import sleep
 from schedule import every, run_pending
 from threading import Thread
+from IT8951 import Display, DisplayModes
 
-from display import Display
 from presenter import Presenter
 
 db = AirMonitorDbClient("test")
@@ -16,8 +16,9 @@ scd30 = SCD30(i2c, 0x61)
 bme280 = BME280(i2c, 0x76)
 sds011 = SDS011("/dev/ttyS0")
 
-disp = Display()
+disp = Display(vcom=-1.64)
 presenter = Presenter(db)
+refresh_interval = 5 * 60
 
 def init_scd30():
     scd30.start_continous_measurement()
@@ -27,11 +28,15 @@ def init_sds011():
     sds011.set_report_mode(active=False)
     sds011.sleep(sleep=True)
 
+def init_display():
+    disp.clear()
+    update_display()
+
 def load_sds011_data():
     sds011.sleep(sleep=False)
 
     # Let it warm up
-    sleep(30)
+    sleep(15)
 
     pm25=0
     pm10=0
@@ -68,29 +73,29 @@ def load_bme280_data():
     db.record_value("pressure", pressure / 100.0, sensor="bme280")
     print("BME280: Pressure: {:.1f} Temperature: {:.2f}".format(pressure/100.0, temp))
 
-def start_display():
-    disp.init()
-    refresh_interval = 5 * 60
+def update_display():
+    try:
+        presenter.render(disp, disp.width, disp.height, refresh_interval)
 
-    while True:
-        (image1, image2) = presenter.render(disp.width, disp.height, refresh_interval)
-        disp.display(disp.getbuffer(image1), disp.getbuffer(image2))
-        sleep(refresh_interval)
+    except:
+        import traceback
+        print(traceback.format_exc())        
+    
 
 def run_threaded(job_func):
     job_thread = Thread(target=job_func)
     job_thread.start()
 
+
 if __name__ == "__main__":
     init_scd30()
     init_sds011()
+    init_display()
 
-    # Load some data now
-    run_threaded(start_display)
-    
     every(30).seconds.do(run_threaded, load_co2_data)
     every(30).seconds.do(run_threaded, load_bme280_data)
     every(5).minutes.do(run_threaded, load_sds011_data)
+    every(30).seconds.do(run_threaded, update_display)
     
     while True:
         run_pending()

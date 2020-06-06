@@ -3,53 +3,103 @@
 from display import Display
 from PIL import Image,ImageDraw,ImageFont
 from datetime import datetime
+import requests
+from IT8951 import DisplayModes
+
+BLACK = 0
+RED = 76
 
 class Presenter:
 
     def __init__(self, db):
         self.db = db
-        self.font24 = ImageFont.truetype('./fonts/Roboto-Medium.ttf', 24)
+        self.font24 = ImageFont.truetype('./fonts/Roboto-Medium.ttf', 20)
         self.font56 = ImageFont.truetype('./fonts/Roboto-Medium.ttf', 56)
-    
-    def render(self, width, height, refresh_interval):
-        image1 = Image.new('1', (width, height), 255)
-        image2 = Image.new('1', (width, height), 255)
+        self.font52 = ImageFont.truetype('./fonts/Roboto-Medium.ttf', 52)
+        self.mono13 = ImageFont.truetype('./fonts/FiraCode-SemiBold.ttf', 13)
+
+    def render(self, disp, width, height, refresh_interval):
+        image = disp.frame_buf
+
+        temp_img = self.paint_box(200, 100, "Temperature", self.db.get_mean_value("temp", "bme280", refresh_interval), "°C")
+        image.paste(temp_img, (0, 0))
+        disp.draw_partial(DisplayModes.GC16)
+
+        co2_img = self.paint_box(200, 100, "CO2", self.db.get_mean_value("co2", "scd30", refresh_interval), "ppm")
+        image.paste(co2_img, (200, 0))
+        disp.draw_partial(DisplayModes.GC16)
+
+        rh_img = self.paint_box(200, 100, "Relative Humidity", self.db.get_mean_value("rh", "scd30", refresh_interval), "%")
+        image.paste(rh_img, (400, 0))
+        disp.draw_partial(DisplayModes.GC16)
+
+        pressure_img = self.paint_box(200, 100, "Pressure", self.db.get_mean_value("pressure", "bme280", refresh_interval), "hPa")
+        image.paste(pressure_img, (600, 0))
+        disp.draw_partial(DisplayModes.GC16)
         
-        draw1 = ImageDraw.Draw(image1)
-        draw2 = ImageDraw.Draw(image2)
+        pm25_img = self.paint_box(200, 100, "PM 2.5", self.db.get_mean_value("pm25", "sds011", refresh_interval), "μg/m³")
+        image.paste(pm25_img, (600, 100))
+        disp.draw_partial(DisplayModes.GC16)
+        
+        pm10_img = self.paint_box(200, 100, "PM 10", self.db.get_mean_value("pm10", "sds011", refresh_interval), "μg/m³")
+        image.paste(pm10_img, (600, 200))
+        disp.draw_partial(DisplayModes.GC16)
+    
+        date = self.date()
+        image.paste(date, (width - date.width, height - date.height))
+        disp.draw_partial(DisplayModes.GC16)
+        
+        weather = self.weather(width, 100)
+        image.paste(weather, (0, height - 100 - date.height - 5))
+        disp.draw_partial(DisplayModes.GC16)
 
-        (temp_img1, temp_img2) = self.paint_box(240, 100, "Temperature", self.db.get_mean_value("temp", "bme280", refresh_interval), "°C")
-        image1.paste(temp_img1, (0, 0))
-        image2.paste(temp_img2, (0, 0))
-
-        (co2_img1, co2_img2) = self.paint_box(320, 100, "CO2", self.db.get_mean_value("co2", "scd30", refresh_interval), "ppm")
-        image1.paste(co2_img1, (240, 0))
-        image2.paste(co2_img2, (240, 0))
-
-        (rh_img1, rh_img2) = self.paint_box(240, 100, "Relative Humidity", self.db.get_mean_value("rh", "scd30", refresh_interval), "%")
-        image1.paste(rh_img1, (560, 0))
-        image2.paste(rh_img2, (560, 0))
-
-        date = datetime.now().strftime("%A, %d %B %Y")
-        (x, y, w, h) = self.font24.getmask(date).getbbox()
-        draw1.text((width - w - 10, height - h - 5), date, font = self.font24, fill = 0)
-
-        return (image1, image2)
-
+        return image
 
     def paint_box(self, w, h, title, value, unit):
-        image1 = Image.new('1', (w, h), 255)
-        image2 = Image.new('1', (w, h), 255)
-        draw1 = ImageDraw.Draw(image1)
-        draw2 = ImageDraw.Draw(image2)
-
+        (image, draw) = self.image(w, h)
+        
         # Center title
-        (x_title, y_title, w_title, h_title) = self.font24.getmask(title).getbbox()
-        draw2.text((w / 2 - (w_title + x_title) / 2, 5), title, font = self.font24, fill = 0)
+        title = "{} ({})".format(title, unit)
+        x = self.center(w, title, self.font24)
+        draw.text((x, 5), title, font = self.font24, fill = RED)
 
         # Draw value
-        value_string = '{:.2f}\u2009{}'.format(value, unit)
-        (x_value, y_value, w_value, h_value) = self.font56.getmask(value_string).getbbox()
-        draw1.text((w / 2 - (w_value + x_value) / 2, 32), value_string, font = self.font56, fill = 0)
+        value_string = '{:.2f}'.format(value)
+        x = self.center(w, value_string, self.font56)
+        draw.text((x, 32), value_string, font = self.font52, fill = BLACK)
         
-        return (image1, image2)
+        return image
+
+    def weather(self, width, height):
+        weather = requests.get("https://wttr.in/?Tn1FQ").text.splitlines()
+
+        now = weather[:5]
+        forecast = weather[9:-1]
+
+        result = []
+        for n, f in zip(now, forecast):
+            t_line = n.ljust(30, ' ')
+            f_line = f[:-1].replace('│', ' ')
+            result.append("{}  {}".format(t_line, f_line))
+        forecast = "\n".join(result)
+        
+        (image, draw) = self.image(width, height)
+        draw.text((self.center(width, result[0], self.mono13), 0), forecast, font = self.mono13, fill = 0)
+        return image
+
+    def date(self):
+        date = datetime.now().strftime("%A, %d %B %Y %H:%M:%S")
+        (x, y, w, h) = self.font24.getmask(date).getbbox()
+
+        (image, draw) = self.image(w, h)
+        draw.text((0, 0), date, font = self.font24, fill = BLACK)
+        return image
+
+    def center(self, parent_width, text, font):
+        (x, y, w, h) = font.getmask(text).getbbox()
+        return int((parent_width / 2) - (w + x) / 2)
+
+    def image(self, width, height):
+        image = Image.new('L', (width, height), 255)
+        draw = ImageDraw.Draw(image)
+        return (image, draw)
