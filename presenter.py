@@ -1,105 +1,117 @@
 #!/usr/bin/env python3
 
-from display import Display
-from PIL import Image,ImageDraw,ImageFont
-from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont
+from datetime import datetime, time
 import requests
-from IT8951 import DisplayModes
+from IT8951 import DisplayModes, Display
+from io import BytesIO
 
-BLACK = 0
-RED = 76
+import seaborn as sns 
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from matplotlib.ticker import FormatStrFormatter
+
+from renderer import *
+
+BLACK = 0x10 * 0
+GRAY_MEDIUM = 0x10 * 8
+GRAY_LIGHT = 0x10 * 10
 
 class Presenter:
 
     def __init__(self, db):
         self.db = db
-        self.font24 = ImageFont.truetype('./fonts/Roboto-Medium.ttf', 20)
-        self.font56 = ImageFont.truetype('./fonts/Roboto-Medium.ttf', 56)
-        self.font52 = ImageFont.truetype('./fonts/Roboto-Medium.ttf', 52)
-        self.mono13 = ImageFont.truetype('./fonts/FiraCode-SemiBold.ttf', 13)
+        self.chart_index = 0
+        self.chart_counter = 5
+        self.night_mode = False
 
     def render(self, disp, width, height, refresh_interval):
-        image = disp.frame_buf
+        if self.is_time_between(time(6, 0), time(1,0)):
+            if self.night_mode:
+                disp.frame_buf.paste(0xFF, box=(0, 0, disp.width, disp.height))
+                self.night_mode = False
 
-        temp_img = self.paint_box(200, 100, "Temperature", self.db.get_mean_value("temp", "bme280", refresh_interval), "°C")
-        image.paste(temp_img, (0, 0))
-        disp.draw_partial(DisplayModes.GC16)
+            disp.epd.run()
+            self.render_day_mode(disp, width, height, refresh_interval)
+            disp.epd.sleep()
 
-        co2_img = self.paint_box(200, 100, "CO2", self.db.get_mean_value("co2", "scd30", refresh_interval), "ppm")
-        image.paste(co2_img, (200, 0))
-        disp.draw_partial(DisplayModes.GC16)
+        elif not self.night_mode:
+            self.night_mode = True
+            disp.epd.run()
+            self.render_night_mode(disp)
+            disp.epd.sleep()
 
-        rh_img = self.paint_box(200, 100, "Relative Humidity", self.db.get_mean_value("rh", "scd30", refresh_interval), "%")
-        image.paste(rh_img, (400, 0))
-        disp.draw_partial(DisplayModes.GC16)
-
-        pressure_img = self.paint_box(200, 100, "Pressure", self.db.get_mean_value("pressure", "bme280", refresh_interval), "hPa")
-        image.paste(pressure_img, (600, 0))
-        disp.draw_partial(DisplayModes.GC16)
+    def render_day_mode(self, disp, width, height, refresh_interval):
+        self.update_chart(disp, width, height)
         
-        pm25_img = self.paint_box(200, 100, "PM 2.5", self.db.get_mean_value("pm25", "sds011", refresh_interval), "μg/m³")
-        image.paste(pm25_img, (600, 100))
-        disp.draw_partial(DisplayModes.GC16)
+        temp_img = paint_box(400, 200, "Temperature", self.db.get_mean_value("temp", "bme280", refresh_interval), "°C")
+        co2_img = paint_box(400, 200, "CO2", self.db.get_mean_value("co2", "scd30", refresh_interval), "ppm")
+        rh_img = paint_box(400, 200, "Relative Humidity", self.db.get_mean_value("rh", "scd30", refresh_interval), "%")
+        pressure_img = paint_box(400, 200, "Pressure", self.db.get_mean_value("pressure", "bme280", refresh_interval), "hPa")
+
+        for i, img in enumerate([temp_img, co2_img, rh_img, pressure_img]):
+            x = int((width / 4) * i)
+            self.paste_and_update(disp, img, (x, 0))
         
-        pm10_img = self.paint_box(200, 100, "PM 10", self.db.get_mean_value("pm10", "sds011", refresh_interval), "μg/m³")
-        image.paste(pm10_img, (600, 200))
-        disp.draw_partial(DisplayModes.GC16)
-    
+        pm_x = int((width / 4) * 3)
+        pm25_img = paint_box(400, 200, "PM 2.5", self.db.get_mean_value("pm25", "sds011", refresh_interval), "μg/m³")
+        self.paste_and_update(disp, pm25_img, (pm_x, 200))
+
+        pm10_img = paint_box(400, 200, "PM 10", self.db.get_mean_value("pm10", "sds011", refresh_interval), "μg/m³")
+        self.paste_and_update(disp, pm10_img, (pm_x, 400))
+        
         date = self.date()
-        image.paste(date, (width - date.width, height - date.height))
-        disp.draw_partial(DisplayModes.GC16)
+        self.paste_and_update(disp, date, (width - date.width - 20, height - date.height - 20))
         
-        weather = self.weather(width, 100)
-        image.paste(weather, (0, height - 100 - date.height - 5))
-        disp.draw_partial(DisplayModes.GC16)
+        w = weather(width, 200)
+        self.paste_and_update(disp, w, (0, height - w.height - date.height - 20))
 
-        return image
+    def render_night_mode(self, disp):
+        (img, draw) = image(disp.width, disp.height)
+        x = center(disp.width, "Good Night!", font(104))
+        draw.text((x, 15), "Good Night!", font = font(104), fill = GRAY_MEDIUM)
+        self.paste_and_update(disp, img, (0, 0))
 
-    def paint_box(self, w, h, title, value, unit):
-        (image, draw) = self.image(w, h)
+    def update_chart(self, disp, width, height):
+        if self.chart_counter < 5:
+            self.chart_counter = self.chart_counter + 1
+            return
+        else:
+            self.chart_counter = 0
+
+        interval = 5 * 60
+        args = [
+            (weather_map, ()),
+            (chart, ("Temperature", "temp", "bme280", interval, "°C")),
+            (chart, ("Pressure", "pressure", "bme280", interval, "hPa")),
+            (chart, ("Relative Humidity", "rh", "scd30", interval, "%%")),
+            (chart, ("CO2", "co2", "scd30", interval, "ppm")),
+            (chart, ("PM 2.5", "pm25", "sds011", interval, "μg/m³")),
+            (chart, ("PM 10", "pm10", "sds011", interval, "μg/m³"))
+        ]
         
-        # Center title
-        title = "{} ({})".format(title, unit)
-        x = self.center(w, title, self.font24)
-        draw.text((x, 5), title, font = self.font24, fill = RED)
-
-        # Draw value
-        value_string = '{:.2f}'.format(value)
-        x = self.center(w, value_string, self.font56)
-        draw.text((x, 32), value_string, font = self.font52, fill = BLACK)
+        (fn, arg) = args[self.chart_index]
         
-        return image
-
-    def weather(self, width, height):
-        weather = requests.get("https://wttr.in/?Tn1FQ").text.splitlines()
-
-        now = weather[:5]
-        forecast = weather[9:-1]
-
-        result = []
-        for n, f in zip(now, forecast):
-            t_line = n.ljust(30, ' ')
-            f_line = f[:-1].replace('│', ' ')
-            result.append("{}  {}".format(t_line, f_line))
-        forecast = "\n".join(result)
-        
-        (image, draw) = self.image(width, height)
-        draw.text((self.center(width, result[0], self.mono13), 0), forecast, font = self.mono13, fill = 0)
-        return image
+        temp_chart_img = fn(*arg)
+        chart_x = int((3 * width / 4 - temp_chart_img.width) / 2)
+        self.paste_and_update(disp, temp_chart_img, (chart_x, 200))
+        self.chart_index = (self.chart_index + 1) % len(args)
 
     def date(self):
-        date = datetime.now().strftime("%A, %d %B %Y %H:%M:%S")
-        (x, y, w, h) = self.font24.getmask(date).getbbox()
+        date = datetime.now().strftime("%A, %d %B %Y %H:%M")
+        (_, _, w, h) = font(36).getmask(date).getbbox()
 
-        (image, draw) = self.image(w, h)
-        draw.text((0, 0), date, font = self.font24, fill = BLACK)
-        return image
+        (img, draw) = image(w, h)
+        draw.text((0, 0), date, font = font(36), fill = GRAY_LIGHT)
+        return img
 
-    def center(self, parent_width, text, font):
-        (x, y, w, h) = font.getmask(text).getbbox()
-        return int((parent_width / 2) - (w + x) / 2)
-
-    def image(self, width, height):
-        image = Image.new('L', (width, height), 255)
-        draw = ImageDraw.Draw(image)
-        return (image, draw)
+    def paste_and_update(self, disp, image, xy):
+        disp.frame_buf.paste(image, xy)
+        disp.draw_partial(DisplayModes.GL16)
+    
+    def is_time_between(self, begin_time, end_time, check_time=None):
+        check_time = check_time or datetime.now().time()
+        if begin_time < end_time:
+            return check_time >= begin_time and check_time <= end_time
+        else:
+            return check_time >= begin_time or check_time <= end_time

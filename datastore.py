@@ -11,32 +11,33 @@ class AirMonitorDbClient:
         
         self.mode = mode
 
-    def get_series(self, desc, sensor, location='unknown'):
+    def get_series(self, desc, sensor, interval, location='unknown'):
         query = """
             SELECT 
-                *
+                mean("value")
             FROM 
                 "{desc}" 
             WHERE 
                 "mode" = $mode 
                 AND "sensor" = $sensor 
                 AND "location" = $location
-                AND time > now() - 12h
+                AND time > now() - 24h
+            GROUP BY time({interval}) fill(linear)
             ORDER BY DESC 
         """
 
         if desc == 'temp':
-            query = query.format(desc = "temp")
+            query = query.format(desc = "temp", interval = '{}s'.format(int(interval)))
         elif desc == 'co2':
-            query = query.format(desc = "co2")
+            query = query.format(desc = "co2", interval = '{}s'.format(int(interval)))
         elif desc == 'rh':
-            query = query.format(desc = "rh")
+            query = query.format(desc = "rh", interval = '{}s'.format(int(interval)))
         elif desc == 'pm25':
-            query = query.format(desc = "pm25")
+            query = query.format(desc = "pm25", interval = '{}s'.format(int(interval)))
         elif desc == 'pm10':
-            query = query.format(desc = "pm10")
+            query = query.format(desc = "pm10", interval = '{}s'.format(int(interval)))
         elif desc == 'pressure':
-            query = query.format(desc = "pressure")
+            query = query.format(desc = "pressure", interval = '{}s'.format(int(interval)))
         else:
             raise Exception("no supported")
 
