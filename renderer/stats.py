@@ -9,8 +9,8 @@ from PIL import Image
 from matplotlib.ticker import FormatStrFormatter
 from .utils import *
 
-def chart(title, desc, sensor, interval, unit):
-    res = self.db.get_series(desc, sensor, interval)[desc]
+def chart(db, title, desc, sensor, interval, unit):
+    res = db.get_series(desc, sensor, interval)[desc]
     sns.set_context("talk", font_scale=0.5)
 
     plot = sns.lineplot(data=res)

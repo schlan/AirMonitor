@@ -59,6 +59,9 @@ class Presenter:
 
         pm10_img = paint_box(400, 200, "PM 10", self.db.get_mean_value("pm10", "sds011", refresh_interval), "μg/m³")
         self.paste_and_update(disp, pm10_img, (pm_x, 400))
+
+        out_temp_img = paint_box(400, 200, "O. Temperature", self.db.get_mean_value("temp", "dgr8h", refresh_interval), "°C")
+        self.paste_and_update(disp, out_temp_img, (pm_x, 600))
         
         date = self.date()
         self.paste_and_update(disp, date, (width - date.width - 20, height - date.height - 20))
@@ -82,19 +85,25 @@ class Presenter:
         interval = 5 * 60
         args = [
             (weather_map, ()),
-            (chart, ("Temperature", "temp", "bme280", interval, "°C")),
-            (chart, ("Pressure", "pressure", "bme280", interval, "hPa")),
-            (chart, ("Relative Humidity", "rh", "scd30", interval, "%%")),
-            (chart, ("CO2", "co2", "scd30", interval, "ppm")),
-            (chart, ("PM 2.5", "pm25", "sds011", interval, "μg/m³")),
-            (chart, ("PM 10", "pm10", "sds011", interval, "μg/m³"))
+            (chart, (self.db, "Temperature", "temp", "bme280", interval, "°C")),
+            (chart, (self.db, "Outside Temperature", "temp", "dgr8h", interval, "°C")),
+            (chart, (self.db, "Pressure", "pressure", "bme280", interval, "hPa")),
+            (chart, (self.db, "Relative Humidity", "rh", "scd30", interval, "%%")),
+            (chart, (self.db, "CO2", "co2", "scd30", interval, "ppm")),
+            (chart, (self.db, "PM 2.5", "pm25", "sds011", interval, "μg/m³")),
+            (chart, (self.db, "PM 10", "pm10", "sds011", interval, "μg/m³"))
         ]
         
         (fn, arg) = args[self.chart_index]
         
+        area_w = int(3 * width / 4)
+        area_h = int(height - 250 - 200)
         temp_chart_img = fn(*arg)
-        chart_x = int((3 * width / 4 - temp_chart_img.width) / 2)
-        self.paste_and_update(disp, temp_chart_img, (chart_x, 200))
+
+        chart_x = int((area_w - temp_chart_img.width) / 2)
+        chart_y = int((area_h - temp_chart_img.height) / 2)
+        disp.frame_buf.paste(0xFF, box=(0, 200, area_w, area_h + 200))
+        self.paste_and_update(disp, temp_chart_img, (chart_x, 200 + chart_y))
         self.chart_index = (self.chart_index + 1) % len(args)
 
     def date(self):

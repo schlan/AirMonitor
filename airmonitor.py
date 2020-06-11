@@ -4,7 +4,7 @@ import logging
 
 from datastore import AirMonitorDbClient
 from i2c import I2C
-from sensors import SCD30, SDS011, BME280
+from sensors import SCD30, SDS011, BME280, DGR8H
 from time import sleep
 from schedule import every, run_pending
 from threading import Thread
@@ -16,6 +16,7 @@ i2c = I2C(bus=1)
 scd30 = SCD30(i2c, 0x61)
 bme280 = BME280(i2c, 0x76)
 sds011 = SDS011("/dev/ttyS0")
+dgr8h = DGR8H(18, )
 
 disp = Display(vcom=-1.64)
 presenter = Presenter(db)
@@ -50,6 +51,14 @@ def init_sds011():
 def init_display():
     disp.clear()
     update_display()
+
+def dgr8h_updated(data):
+    db.record_value("temp", data['temp'], sensor="dgr8h")
+    db.record_value("humidity", data['humidity'], sensor="dgr8h")
+    log.info(f"DGR8H: Temp: {data['temp']}, humidity: {data['humidity']}")
+
+def init_dgr8h():
+    dgr8h.init(dgr8h_updated)
 
 def load_sds011_data():
     sds011.sleep(sleep=False)
@@ -106,6 +115,7 @@ def run_threaded(job_func):
 
 if __name__ == "__main__":
     log.info("Start")
+    init_dgr8h()
     init_scd30()
     init_sds011()
     init_display()
