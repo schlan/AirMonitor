@@ -3,9 +3,6 @@
 from setuptools import setup, find_packages, Extension
 from sys import version_info
 
-if version_info[0] != 3:
-    raise RuntimeError("This module is written for Python 3.")
-
 extensions = [
     Extension(
         "IT8951.spi",

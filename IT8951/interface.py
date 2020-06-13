@@ -18,7 +18,7 @@ class EPD:
 
     def __init__(self, vcom=-1.5):
 
-        self.spi = SPI()
+        self.spi = SPI(max_speed_hz=8000000)
 
         self.width            = None
         self.height           = None

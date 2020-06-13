@@ -91,7 +91,7 @@ class DGR8H:
             'battery': battery,
             'channel': channel,
             'temp': temp,
-            'humidity': humidity,
+            'humidity': float(humidity),
         })
 
     def twos_comp(self, val, bits):
