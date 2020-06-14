@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime, time
 
 BLACK = 0x10 * 0
+GRAY_DARK = 0x10 * 4
 GRAY_MEDIUM = 0x10 * 8
 GRAY_LIGHT = 0x10 * 10
 

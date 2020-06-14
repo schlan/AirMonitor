@@ -13,9 +13,6 @@ from matplotlib.ticker import FormatStrFormatter
 
 from renderer import *
 
-BLACK = 0x10 * 0
-GRAY_MEDIUM = 0x10 * 8
-GRAY_LIGHT = 0x10 * 10
 
 class Presenter:
 
@@ -90,9 +87,9 @@ class Presenter:
                 (
                     self.db,
                     [
-                        ("Indoor Temperatur", "temp", "dgr8h", interval, "°C"),
+                        ("Indoor Temperatur", "temp", "bme280", interval, "°C"),
                         ("Indoor Humidity", "rh", "scd30", interval, "%%"),
-                        ("Outdoor Temperatur", "temp", "bme280", interval, "°C"),
+                        ("Outdoor Temperatur", "temp", "dgr8h", interval, "°C"),
                         ("Outdoor Humidity", "rh", "dgr8h", interval, "%%")
                     ]
                 ) 

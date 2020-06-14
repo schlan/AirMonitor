@@ -17,7 +17,7 @@ setup(
     description='Monitor the air quality',
     author='Sebastian Chlan',
     author_email='sebastian.chlan@gmail.com',
-    url='https://www.example.com/',
+    url='https://github.com/schlan/AirMonitor',
     ext_modules=extensions,
     packages=find_packages(),
     setup_requires=[

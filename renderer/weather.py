@@ -5,38 +5,53 @@ from datetime import datetime, time
 from io import BytesIO
 import requests
 from .utils import *
+import logging
+
+log = logging.getLogger("AirMonitor")
+map_cache = {}
 
 def weather_map():        
     zoom = 7
     
-    url = "https://api.mapbox.com/styles/v1/mapbox/light-v10/tiles/256/{zoom}/{x}/{y}?access_token=pk.eyJ1Ijoic2ViY2hsYW4iLCJhIjoiY2tiNHp3NHRvMGtucTJ6bzZqMWp4NWI5ZyJ9.GoKM2Z-fWqCDDgftOZf6cw"
-    rain = requests.get("https://api.met.ie/api/maps/radar").json()
-    
-    now = int(datetime.timestamp(datetime.now()))
-    rain_url = "{server}/api/maps/radar/{src}/{x}/{y}/{zoom}/{now}"
-    src = rain[-1]['src']
-    timestamp = rain[-1]['mapTime']
-    server = rain[-1]['server']
+    url = map_url()
+    (rain_url, timestamp) = load_pre_info()
 
     base_map = Image.new('RGBA', (256 * 3, 256 * 3 - 56), (255,255,255,255))
-    pre_base = Image.new('RGBA', (256 * 3, 256 * 3 - 56), (255,255,255,255))
     for i, x in enumerate(range(60, 63)):
         for j, y in enumerate(range(40, 43)):
-            tile = requests.get(rain_url.format(server=server, zoom=zoom, x=x, y=y, src=src, now=now))
-            pre_img = Image.open(BytesIO(tile.content)).convert('RGBA')
-            
-            response = requests.get(url.format(zoom=zoom, x=x, y=y))
-            base_img = Image.open(BytesIO(response.content)).convert('RGBA')
+            pre_img = load_tile(rain_url.format(zoom=zoom, x=x, y=y))
+            base_img = load_tile(url.format(zoom=zoom, x=x, y=y), cachable=True)
 
-            base_img.paste(pre_img, (0,0), pre_img)
-
-            pre_base.paste(pre_img, (pre_img.width * i, pre_img.height * j))        
+            base_img.paste(pre_img, (0, 0), pre_img)
             base_map.paste(base_img, (pre_img.width * i, pre_img.height * j))       
 
     draw = ImageDraw.Draw(base_map)
-    draw.text((10, 10), timestamp, font = font(36), fill = BLACK)
+    draw.text((10, base_map.height - 50), timestamp, font = font(36), fill = GRAY_DARK)
 
     return base_map
+
+def load_tile(url, cachable=False):
+    if url in map_cache and cachable:
+        return map_cache[url]
+
+    result = requests.get(url)
+    image = Image.open(BytesIO(result.content)).convert('RGBA')
+    map_cache[url] = image
+    return image
+
+def map_url(token="pk.eyJ1Ijoic2ViY2hsYW4iLCJhIjoiY2tiNHp3NHRvMGtucTJ6bzZqMWp4NWI5ZyJ9.GoKM2Z-fWqCDDgftOZf6cw"):
+    return "https://api.mapbox.com/styles/v1/mapbox/light-v10/tiles/256/{{zoom}}/{{x}}/{{y}}?access_token={token}".format(token=token)
+
+def load_pre_info():
+    rain = requests.get("https://api.met.ie/api/maps/radar").json()
+    timestamp = rain[-1]['mapTime']
+    server = rain[-1]['server']
+    src = rain[-1]['src']
+
+    ts = str(int(datetime.timestamp(datetime.now())))
+    rain_url = "{server}/api/maps/radar/{src}/{{x}}/{{y}}/{{zoom}}/{timestamp}".format(server=server, src=src, timestamp=ts)
+    
+    return (rain_url, rain[-1]['mapTime'])
 
 
 def weather(width, height):
