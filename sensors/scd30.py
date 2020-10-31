@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-#from machine import I2C
-#import utime
 from time import sleep
 import struct
 
