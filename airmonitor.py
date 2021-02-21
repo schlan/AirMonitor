@@ -5,6 +5,7 @@ from i2c import I2C
 from sensors import SCD30, SDS011, BME280, DGR8H
 from time import sleep
 from schedule import every, run_pending
+from buttons import Buttons
 
 from IT8951 import Display, DisplayModes
 from presenter import Presenter
@@ -20,6 +21,7 @@ scd30 = SCD30(i2c, 0x61)
 bme280 = BME280(i2c, 0x76)
 sds011 = SDS011("/dev/ttyS0")
 dgr8h = DGR8H(18)
+buttons = Buttons([20, 21])
 
 disp = Display(vcom=-1.64)
 presenter = Presenter(db)
@@ -99,8 +101,15 @@ def update_display():
     presenter.render(disp, disp.width, disp.height)
     log.info("Display update finished")
 
+def button_click(gpio):
+    print(gpio)
+
+def init_buttons():
+    buttons.init(button_click)
+
 if __name__ == "__main__":
     log.info("Start")
+    init_buttons()
     init_dgr8h()
     init_scd30()
     init_sds011()
@@ -108,9 +117,9 @@ if __name__ == "__main__":
 
     every(30).seconds.do(run_threaded, load_co2_data)
     every(30).seconds.do(run_threaded, load_bme280_data)
-    every(5).minutes.do(run_threaded, load_sds011_data)
+    every(30).seconds.do(run_threaded, load_sds011_data)
     every(60).seconds.do(run_threaded, update_display)
     
     while True:
         run_pending()
-        sleep(1)
+        sleep(1)    

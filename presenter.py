@@ -107,7 +107,7 @@ class Presenter:
                 ) 
             ),
             (
-                weather_map,
+                weather,
                 ()
             )
         ]
@@ -135,7 +135,7 @@ class Presenter:
 
         (img, draw) = image(w, h)
         draw.text((0, 0), date, font = font(42), fill = GRAY_LIGHT)
-        self.paste_and_update(disp, img, (width - img.width - 20, height - img.height - 20))
+        self.paste_and_update(disp, img, (width - img.width - 20, height - img.height - 10))
         
 
     def paste_and_update(self, disp, image, xy):
